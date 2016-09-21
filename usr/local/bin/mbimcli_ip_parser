@@ -76,6 +76,10 @@ while true; do
 		"start")
 			read line # first line is empty, read a new one
 			case "$line" in
+				*"IPv4 configuration available: 'none'"*)
+				        next_state "exit"
+				        continue
+					;;
 				*"IPv4 configuration available"*)
 					next_state "ipv4_ip"
 					continue
