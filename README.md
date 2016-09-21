@@ -6,7 +6,7 @@ The modem in the Thinkpad x260 needs at least Linux 4.7 (for a [firmware bug wor
 
 ## Installation
 
-1. Install dependencies with `apt-get install lua5.1 libjson-c-dev resolvconf`.
+1. Install dependencies with `apt-get install lua5.1 libjson-c-dev resolvconf libmbim-utils/sid`.
 2. Build umbim: `./build-umbim`.
 3. Create tarball: `tar -cvz etc usr >thinkpad-x260-modem-scripts.tar.gz`
 4. Install tarball: `sudo tar -oxzf thinkpad-x260-modem-scripts.tar.gz -C /`
