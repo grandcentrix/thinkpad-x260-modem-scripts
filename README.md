@@ -2,7 +2,7 @@
 
 ## Installation
 
-1. Install umbim dependencies with `apt-get install lua5.1 libjson-c-dev`.
+1. Install dependencies with `apt-get install lua5.1 libjson-c-dev resolvconf`.
 2. Build umbim: `./build-umbim`.
 3. Create tarball: `tar -cvz etc usr >thinkpad-x260-modem-scripts.tar.gz`
 4. Install tarball: `sudo tar -oxzf thinkpad-x260-modem-scripts.tar.gz -C /`
