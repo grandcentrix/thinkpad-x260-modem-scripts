@@ -80,6 +80,10 @@ while true; do
 					next_state "ipv4_ip"
 					continue
 					;;
+				*"IPv6 configuration available: 'none'"*)
+				        next_state "exit"
+				        continue
+					;;
 				*"IPv6 configuration available"*)
 					next_state "ipv6_ip"
 					continue
