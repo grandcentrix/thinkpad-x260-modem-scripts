@@ -1,0 +1,5 @@
+#!/bin/sh
+
+ip l s wwp0s20f0u3i12 down
+resolvconf -d wwp0s20f0u3i12.inet -u
+mbim-network /dev/cdc-wdm0 stop

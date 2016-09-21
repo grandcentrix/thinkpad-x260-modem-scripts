@@ -1,0 +1,278 @@
+#!/bin/bash
+
+DEV="wwp0s20f0u3i12"
+ARG="$1"
+
+previous_state="none"
+state="start"
+skip_line=0
+ipv4_addresses=()
+ipv4_gateway=""
+ipv4_dns=()
+ipv4_mtu=""
+ipv6_addresses=()
+ipv6_gateway=""
+ipv6_dns=()
+ipv6_mtu=""
+
+function print {
+	: #echo "[$state] $1"
+}
+
+function next_state {
+	previous_state="$state"
+	state="$1"
+}
+
+function parse_ip {
+	#      IP [0]: '10.134.203.177/30'
+	local line_re="IP \[([0-9]+)\]: '(.+)'"
+	local input=$1
+	if [[ $input =~ $line_re ]]; then
+		local ip_cnt=${BASH_REMATCH[1]}
+		local ip=${BASH_REMATCH[2]}
+	fi
+	echo "$ip"
+}
+
+function parse_dns {
+	#      IP [0]: '10.134.203.177/30'
+	local line_re="DNS \[([0-9]+)\]: '(.+)'"
+	local input=$1
+	if [[ $input =~ $line_re ]]; then
+		local dns_cnt=${BASH_REMATCH[1]}
+		local dns=${BASH_REMATCH[2]}
+	fi
+	echo "$dns"
+}
+
+function parse_gateway {
+	#    Gateway: '10.134.203.178'
+	local line_re="Gateway: '(.+)'"
+	local input=$1
+	if [[ $input =~ $line_re ]]; then
+		local gw=${BASH_REMATCH[1]}
+	fi
+	echo "$gw"
+}
+
+function parse_mtu {
+	#        MTU: '1500'
+	local line_re="MTU: '([0-9]+)'"
+	local input=$1
+	if [[ $input =~ $line_re ]]; then
+		local mtu=${BASH_REMATCH[1]}
+	fi
+	echo "$mtu"
+}
+
+while true; do
+	if [[ "$skip_line" == 0 ]]; then
+		read line
+	else
+		skip_line=0
+	fi
+	case "$state" in
+		"start")
+			read line # first line is empty, read a new one
+			case "$line" in
+				*"IPv4 configuration available"*)
+					next_state "ipv4_ip"
+					continue
+					;;
+				*"IPv6 configuration available"*)
+					next_state "ipv6_ip"
+					continue
+					;;
+				*)
+					next_state "exit"
+					continue
+					;;
+			esac
+			;;
+		"error")
+			print "Error in state $previous_state. Exiting."
+			exit 0
+			;;
+		"exit")
+			break
+			;;
+		"ipv4_ip")
+			ipv4=$(parse_ip "$line")
+			if [ -z "$ipv4" ]; then
+				if [[ "${#ipv4_addresses[@]}" < 1 ]]; then
+					next_state "error"
+					continue
+				else
+					next_state "ipv4_gateway"
+					skip_line=1
+					continue
+				fi
+			fi
+			print "$ipv4"
+			ipv4_addresses+=("$ipv4")
+			;;
+		"ipv4_gateway")
+			gw=$(parse_gateway "$line")
+			if [ -z "$gw" ]; then
+				next_state "error"
+				continue
+			fi
+			print "$gw"
+			ipv4_gateway="$gw"
+			next_state "ipv4_dns"
+			;;
+		"ipv4_dns")
+			ipv4=$(parse_dns "$line")
+			if [ -z "$ipv4" ]; then
+				if [[ "${#ipv4_dns[@]}" < 1 ]]; then
+					next_state "error"
+					continue
+				else
+					next_state "ipv4_mtu"
+					skip_line=1
+					continue
+				fi
+			fi
+			print "$ipv4"
+			ipv4_dns+=("$ipv4")
+			;;
+		"ipv4_mtu")
+			mtu=$(parse_mtu "$line")
+			if [ -z "$mtu" ]; then
+				next_state "error"
+				continue
+			fi
+			print "$mtu"
+			ipv4_mtu="$mtu"
+			next_state "start"
+			;;
+		"ipv6_ip")
+			ipv6=$(parse_ip "$line")
+			if [ -z "$ipv6" ]; then
+				if [[ "${#ipv6_addresses[@]}" < 1 ]]; then
+					next_state "error"
+					continue
+				else
+					next_state "ipv6_gateway"
+					skip_line=1
+					continue
+				fi
+			fi
+			print "$ipv6"
+			ipv6_addresses+=("$ipv6")
+			;;
+		"ipv6_gateway")
+			gw=$(parse_gateway "$line")
+			if [ -z "$gw" ]; then
+				next_state "error"
+				continue
+			fi
+			print "$gw"
+			ipv6_gateway="$gw"
+			next_state "ipv6_dns"
+			;;
+		"ipv6_dns")
+			ipv6=$(parse_dns "$line")
+			if [ -z "$ipv6" ]; then
+				if [[ "${#ipv6_dns[@]}" < 1 ]]; then
+					next_state "error"
+					continue
+				else
+					next_state "ipv6_mtu"
+					skip_line=1
+					continue
+				fi
+			fi
+			print "$ipv6"
+			ipv6_dns+=("$ipv6")
+			;;
+		"ipv6_mtu")
+			mtu=$(parse_mtu "$line")
+			if [ -z "$mtu" ]; then
+				next_state "error"
+				continue
+			fi
+			print "$mtu"
+			ipv6_mtu="$mtu"
+			next_state "start"
+			;;
+		*)
+			print "Invalid state (came from $previous_state). Exiting."
+			exit 0
+			;;
+	esac
+done
+
+if [[ "${#ipv4_addresses[@]}" > 0 ]]; then
+	printf "IPv4: "
+	printf '%s, ' "${ipv4_addresses[@]}"
+	printf "\n"
+
+	printf "GW: $ipv4_gateway\n"
+
+	printf "DNS: "
+	printf '%s, ' "${ipv4_dns[@]}"
+	printf "\n"
+
+	printf "MTU: $ipv4_mtu\n"
+fi
+
+if [[ "${#ipv6_addresses[@]}" > 0 ]]; then
+	echo
+	printf "IPv6: "
+	printf '%s, ' "${ipv6_addresses[@]}"
+	printf "\n"
+
+	printf "GW: $ipv6_gateway\n"
+
+	printf "DNS: "
+	printf '%s, ' "${ipv6_dns[@]}"
+	printf "\n"
+
+	printf "MTU: $ipv6_mtu\n"
+fi
+
+execfile=$(mktemp)
+dnsfile=$(mktemp)
+
+printf "ip link set $DEV up\n" >> $execfile
+if [[ "${#ipv4_addresses[@]}" > 0 ]]; then
+	printf "ip addr add %s dev $DEV broadcast +\n" "${ipv4_addresses[@]}" >> $execfile
+	printf "ip link set $DEV mtu $ipv4_mtu\n" >> $execfile
+	printf "ip route add default via $ipv4_gateway dev $DEV\n" >> $execfile
+	printf "nameserver %s\n" "${ipv4_dns[@]}" >> $dnsfile
+fi
+
+if [[ "${#ipv6_addresses[@]}" > 0 ]]; then
+	printf "ip -6 addr add %s dev $DEV\n" "${ipv6_addresses[@]}" >> $execfile
+	printf "ip -6 route add default via $ipv6_gateway dev $DEV\n" >> $execfile
+	printf "ip -6 link set $DEV mtu $ipv6_mtu\n" >> $execfile
+	printf "nameserver %s\n" "${ipv6_dns[@]}" >> $dnsfile
+fi
+
+case "$ARG" in
+	"-a")
+		;;
+	"-p")
+		cat $execfile
+		rm $execfile
+		rm $dnsfile
+		exit 0
+		;;
+	*)
+		echo "USAGE: $0 -a|-p"
+		echo "-a: Apply iproute2 and DNS config"
+		echo "-p: Pretend (and display) iproute2 config"
+		rm $execfile
+		exit 0
+		;;
+esac
+
+echo "Applying config..."
+bash $execfile
+
+resolvconf -a $DEV.inet -u <$dnsfile
+
+rm $execfile
+rm $dnsfile
