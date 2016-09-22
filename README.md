@@ -25,6 +25,10 @@ Install package:
 2. Change APN in `/etc/mbim-network.conf`.
 3. Start LTE with `sudo lte_start`.
 
+### Debugging
+
+1. If `sudo lte_start` fails because you have not entered a PIN, use mbimcli to enter it.
+
 ## Stop LTE
 
 1. Stop LTE with `sudo lte_stop`.
